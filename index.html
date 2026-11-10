@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neon Dodge</title>
+<style>
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    background: #080b18;
+    color: white;
+    font-family: Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    overflow: hidden;
+}
+
+.game {
+    text-align: center;
+    width: 95%;
+    max-width: 500px;
+}
+
+h1 {
+    color: #00f7ff;
+    font-size: 38px;
+    letter-spacing: 5px;
+    text-shadow: 0 0 15px #00f7ff;
+}
+
+.stats {
+    display: flex;
+    justify-content: space-around;
+    margin: 15px 0;
+    font-size: 18px;
+}
+
+canvas {
+    width: 100%;
+    max-width: 400px;
+    background: #10162b;
+    border: 2px solid #00f7ff;
+    border-radius: 12px;
+    box-shadow: 0 0 25px #00f7ff44;
+}
+
+button {
+    background: #00f7ff;
+    color: #080b18;
+    border: none;
+    padding: 13px 28px;
+    margin: 15px 5px;
+    font-size: 16px;
+    font-weight: bold;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+button:hover {
+    background: white;
+    transform: scale(1.05);
+}
+
+p { color: #aab5d5; }
+
+.controls {
+    display: flex;
+    justify-content: center;
+    gap: 25px;
+}
+
+.controls button {
+    width: 75px;
+    font-size: 24px;
+}
+</style>
+</head>
+<body>
+
+<div class="game">
+    <h1>NEON DODGE</h1>
+
+    <div class="stats">
+        <span>Score: <b id="score">0</b></span>
+        <span>Best: <b id="best">0</b></span>
+    </div>
+
+    <canvas id="canvas" width="400" height="500"></canvas>
+
+    <div>
+        <button onclick="startGame()">START / RESTART</button>
+    </div>
+
+    <div class="controls">
+        <button id="left">←</button>
+        <button id="right">→</button>
+    </div>
+
+    <p>Use ← → or A / D to move. Dodge the red blocks!</p>
+</div>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+let player, blocks, score, running, gameOver;
+let keys = {};
+let best = Number(localStorage.getItem("neonBest")) || 0;
+
+document.getElementById("best").textContent = best;
+
+function reset() {
+    player = { x: 180, y: 440, width: 40, height: 40, speed: 6 };
+    blocks = [];
+    score = 0;
+    running = true;
+    gameOver = false;
+    document.getElementById("score").textContent = score;
+}
+
+function startGame() {
+    reset();
+    requestAnimationFrame(loop);
+}
+
+function drawPlayer() {
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = "#00f7ff";
+    ctx.fillStyle = "#00f7ff";
+    ctx.fillRect(player.x, player.y, player.width, player.height);
+    ctx.shadowBlur = 0;
+}
+
+function spawnBlock() {
+    const size = 25 + Math.random() * 30;
+    blocks.push({
+        x: Math.random() * (canvas.width - size),
+        y: -size,
+        size: size,
+        speed: 3 + Math.random() * 2 + score / 100
+    });
+}
+
+function collision(a, b) {
+    return a.x < b.x + b.size &&
+           a.x + a.width > b.x &&
+           a.y < b.y + b.size &&
+           a.y + a.height > b.y;
+}
+
+let frame = 0;
+
+function loop() {
+    if (!running) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Background stars
+    ctx.fillStyle = "#263653";
+    for (let i = 0; i < 20; i++) {
+        let x = (i * 83) % 400;
+        let y = (i * 127 + frame * 0.5) % 500;
+        ctx.fillRect(x, y, 2, 2);
+    }
+
+    if (keys["ArrowLeft"] || keys["a"])
+        player.x -= player.speed;
+
+    if (keys["ArrowRight"] || keys["d"])
+        player.x += player.speed;
+
+    player.x = Math.max(0, Math.min(360, player.x));
+
+    if (frame % Math.max(15, 45 - Math.floor(score / 5)) === 0)
+        spawnBlock();
+
+    blocks.forEach(block => {
+        block.y += block.speed;
+
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = "#ff245c";
+        ctx.fillStyle = "#ff245c";
+        ctx.fillRect(block.x, block.y, block.size, block.size);
+        ctx.shadowBlur = 0;
+
+        if (collision(player, block)) {
+            running = false;
+            gameOver = true;
+        }
+    });
+
+    blocks = blocks.filter(block => block.y < 520);
+
+    drawPlayer();
+
+    if (frame % 6 === 0) {
+        score++;
+        document.getElementById("score").textContent = score;
+    }
+
+    frame++;
+
+    if (gameOver) {
+        if (score > best) {
+            best = score;
+            localStorage.setItem("neonBest", best);
+            document.getElementById("best").textContent = best;
+        }
+
+        ctx.fillStyle = "rgba(0,0,0,0.75)";
+        ctx.fillRect(0, 0, 400, 500);
+
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#ff245c";
+        ctx.font = "bold 38px Arial";
+        ctx.fillText("GAME OVER", 200, 225);
+
+        ctx.fillStyle = "white";
+        ctx.font = "20px Arial";
+        ctx.fillText("Score: " + score, 200, 270);
+        ctx.font = "15px Arial";
+        ctx.fillText("Press START to play again", 200, 310);
+        return;
+    }
+
+    requestAnimationFrame(loop);
+}
+
+document.addEventListener("keydown", e => {
+    keys[e.key] = true;
+});
+
+document.addEventListener("keyup", e => {
+    keys[e.key] = false;
+});
+
+function holdButton(id, key) {
+    const button = document.getElementById(id);
+    button.addEventListener("pointerdown", e => {
+        e.preventDefault();
+        keys[key] = true;
+    });
+    button.addEventListener("pointerup", () => keys[key] = false);
+    button.addEventListener("pointerleave", () => keys[key] = false);
+    button.addEventListener("pointercancel", () => keys[key] = false);
+}
+
+holdButton("left", "ArrowLeft");
+holdButton("right", "ArrowRight");
+
+ctx.fillStyle = "white";
+ctx.textAlign = "center";
+ctx.font = "22px Arial";
+ctx.fillText("Press START to play!", 200, 250);
+</script>
+
+</body>
+</html>
